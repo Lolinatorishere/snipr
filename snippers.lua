@@ -1,7 +1,8 @@
-local JsSnips = require("custom.sniper.snipss.javascript")
-local HtmlSnips = require("custom.sniper.snipss.html")
-local Middleware = require("custom.middleware")
+local JsSnips = require("custom.snipr.snips.javascript")
+local HtmlSnips = require("custom.snipr.snips.html")
+local Middleware = require("custom.snipr.middleware")
 local wk = require("which-key")
+local binds = { ft = "", binds = {} }
 
 local Allowed_ft = {
     javascript = true,
@@ -24,18 +25,19 @@ function Snippers(ft)
         pcall(vim.keymap.del, "n", "<leader>h")
         return
     end
-    if Allowed_ft[ft] == true then
+    if Allowed_ft[ft] then
+        if #binds.binds > 0 and ft ~= binds.ft then
+            Middleware.unsetBinds(binds.binds, wk)
+        end
         if ft == "javascript" then
-            JsSnips(Middleware, wk)
+            binds = JsSnips(Middleware, wk)
             return
         end
         if ft == "html" then
-            HtmlSnips(Middleware, wk)
+            Middleware.unsetBinds(binds)
+            binds = HtmlSnips(Middleware, wk)
             return
         end
-        wk.add({
-            { "<leader>h", group = "snips", desc = "no snips available" },
-        })
         vim.notify("no snips for filetype: " .. ft, vim.log.levels.INFO)
         return
     end
@@ -45,4 +47,8 @@ function Snippers(ft)
     pcall(vim.keymap.del, "n", "<leader>h")
 end
 
-return Snippers
+vim.api.nvim_create_autocmd({ "BufEnter" }, {
+    callback = function()
+        Snippers(vim.bo.filetype)
+    end,
+})

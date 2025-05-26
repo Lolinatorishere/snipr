@@ -1,37 +1,12 @@
---local keys = {
---    "q", -- if(){}
---    "a", -- async function{}
---    "s", -- function{}
---    "d", -- document.getElementById
---    "f", -- addEventListener
---    "z", -- call async function()
---    "x", -- call async arrow function ()
---    "k", -- console.error
---    "l", -- console.log
---}
+local lines = 0
+local empty = 0
+local mode = "n"
+local endofline = false
+local reg = ""
+local colpos = 0
 
-local function SetJsFuncs(key, middleware)
-    local indent = middleware.GetContentUnderCursor()
-    local SeperateWords = middleware.SeperateWords
-    local remove_special_chars = middleware.remove_special_chars
-    --    vim.notify(key, vim.log.levels.INFO)
-    local reg = ""
-    local lines = 0
-    local empty = 0
-    local mode = "n"
-    local endofline = false
-    local colpos = 0
-    if key == nil then
-        return
-    end
-    if vim.fn.getreg("+") == nil then
-        return
-    end
-    local words = SeperateWords(vim.fn.getreg("+"))
-    if #words == 0 then
-        return
-    end
-    if key == "q" then
+local keys = {
+    q = function(words, _)
         reg = "if (" .. words[1]
         if #words > 1 then
             for i = 2, #words do
@@ -43,8 +18,8 @@ local function SetJsFuncs(key, middleware)
         empty = 2
         mode = "i"
         endofline = true
-    end
-    if key == "s" then
+    end,
+    s = function(words, _)
         reg = "function " .. words[1] .. "("
         if #words > 1 then
             for i = 2, #words do
@@ -60,9 +35,9 @@ local function SetJsFuncs(key, middleware)
         empty = 2
         mode = "i"
         endofline = true
-    end
-    if key == "a" then
-        reg = "async function " .. remove_special_chars(words[1]) .. "("
+    end,
+    a = function(words, m)
+        reg = "async function " .. m.remove_special_chars(words[1]) .. "("
         if #words > 1 then
             for i = 2, #words do
                 if i == #words then
@@ -77,9 +52,9 @@ local function SetJsFuncs(key, middleware)
         empty = 2
         mode = "i"
         endofline = true
-    end
-    if key == "A" then
-        reg = "async " .. remove_special_chars(words[1]) .. "("
+    end,
+    A = function(words, m)
+        reg = "async " .. m.remove_special_chars(words[1]) .. "("
         if #words > 1 then
             for i = 2, #words do
                 if i == #words then
@@ -93,9 +68,9 @@ local function SetJsFuncs(key, middleware)
         lines = 1
         empty = 1
         endofline = true
-    end
-    if key == "S" then
-        reg = remove_special_chars(words[1]) .. "("
+    end,
+    S = function(words, m)
+        reg = m.remove_special_chars(words[1]) .. "("
         if #words > 1 then
             for i = 2, #words do
                 if i == #words then
@@ -109,8 +84,8 @@ local function SetJsFuncs(key, middleware)
         lines = 1
         empty = 1
         endofline = true
-    end
-    if key == "d" then
+    end,
+    d = function(words, _)
         if #words > 1 then
             reg = "let " .. words[1] .. " = document.getElementById('" .. words[2]
         else
@@ -122,22 +97,22 @@ local function SetJsFuncs(key, middleware)
         empty = 1
         mode = "i"
         endofline = true
-    end
-    if key == "f" then
+    end,
+    f = function(words, _)
         reg = ".addEventListener(" .. words[1] .. ", () => {\n\n});"
         lines = 3
         empty = 1
         mode = "i"
         endofline = true
-    end
-    if key == "F" then
+    end,
+    F = function(words, _)
         reg = ".addEventListener(" .. words[1] .. ", async() => {\n\n});"
         lines = 3
         empty = 1
         mode = "i"
         endofline = true
-    end
-    if key == "k" then
+    end,
+    k = function(words, _)
         reg = "console.error(" .. words[1]
         if #words > 1 then
             for i = 2, #words do
@@ -151,8 +126,8 @@ local function SetJsFuncs(key, middleware)
         lines = 1
         empty = 1
         endofline = true
-    end
-    if key == "l" then
+    end,
+    l = function(words, _)
         reg = "console.log(" .. words[1]
         if #words > 1 then
             for i = 2, #words do
@@ -166,7 +141,23 @@ local function SetJsFuncs(key, middleware)
         lines = 1
         empty = 1
         endofline = true
+    end,
+}
+
+local function SetFuncs(key, middleware)
+    local indent = middleware.GetContentUnderCursor()
+    local SeperateWords = middleware.SeperateWords
+    if key == nil then
+        return
     end
+    if vim.fn.getreg("+") == nil then
+        return
+    end
+    local words = SeperateWords(vim.fn.getreg("+"))
+    if #words == 0 then
+        return
+    end
+    keys[key](words, middleware)
     local print = vim.split(reg, "\n")
     local row = vim.api.nvim_win_get_cursor(0)[1] - 1
     local col = vim.api.nvim_win_get_cursor(0)[2]
@@ -180,79 +171,42 @@ local function SetJsFuncs(key, middleware)
 end
 
 local function JsUpdateBuffers(middleware, wk)
+    local ibinds = {}
     wk.add({
         { "<leader>h", group = "Js snips" },
-        {
-            "<leader>hq",
-            function()
-                SetJsFuncs("q", middleware)
-            end,
-            desc = "if(words..){}",
-        },
-        {
-            "<leader>ha",
-            function()
-                SetJsFuncs("a", middleware)
-            end,
-            desc = "async function(words..){ }",
-        },
-        {
-            "<leader>hs",
-            function()
-                SetJsFuncs("s", middleware)
-            end,
-            desc = "function(words..){ }",
-        },
-        {
-            "<leader>hd",
-            function()
-                SetJsFuncs("d", middleware)
-            end,
-            desc = "document.getElementById('word')",
-        },
-        {
-            "<leader>hf",
-            function()
-                SetJsFuncs("f", middleware)
-            end,
-            desc = ".addEventListener('word', () => {})",
-        },
-        {
-            "<leader>hF",
-            function()
-                SetJsFuncs("F", middleware)
-            end,
-            desc = "addEventListener('word', async () => {})",
-        },
-        {
-            "<leader>hA",
-            function()
-                SetJsFuncs("A", middleware)
-            end,
-            desc = "words (words..)",
-        },
-        {
-            "<leader>hS",
-            function()
-                SetJsFuncs("S", middleware)
-            end,
-            desc = "words (words..)",
-        },
-        {
-            "<leader>hk",
-            function()
-                SetJsFuncs("k", middleware)
-            end,
-            desc = "console.error(words..)",
-        },
-        {
-            "<leader>hl",
-            function()
-                SetJsFuncs("l", middleware)
-            end,
-            desc = "console.log(words..)",
-        },
     })
+    vim.keymap.set("n", "<leader>hq", function()
+        SetFuncs("q", middleware)
+    end, { desc = "if(words..){}" })
+    vim.keymap.set("n", "<leader>ha", function()
+        SetFuncs("a", middleware)
+    end, { desc = "async function(words..){ }" })
+    vim.keymap.set("n", "<leader>hs", function()
+        SetFuncs("s", middleware)
+    end, { desc = "function(words..){ }" })
+    vim.keymap.set("n", "<leader>hd", function()
+        SetFuncs("d", middleware)
+    end, { desc = "document.getElementById('word')" })
+    vim.keymap.set("n", "<leader>hf", function()
+        SetFuncs("f", middleware)
+    end, { desc = ".addEventListener('word', () => {})" })
+    vim.keymap.set("n", "<leader>hF", function()
+        SetFuncs("F", middleware)
+    end, { desc = "addEventListener('word', async () => {})" })
+    vim.keymap.set("n", "<leader>hA", function()
+        SetFuncs("A", middleware)
+    end, { desc = "words (words..)" })
+    vim.keymap.set("n", "<leader>hS", function()
+        SetFuncs("S", middleware)
+    end, { desc = "words (words..)" })
+    vim.keymap.set("n", "<leader>hk", function()
+        SetFuncs("k", middleware)
+    end, { desc = "console.error(words..)" })
+    vim.keymap.set("n", "<leader>hl", function()
+        SetFuncs("l", middleware)
+    end, { desc = "console.log(words..)" })
+    ibinds = middleware.getObjKeyNames(keys)
+    return { ft = "javascript", binds = ibinds }
 end
 
 return JsUpdateBuffers

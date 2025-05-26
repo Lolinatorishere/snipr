@@ -1,4 +1,19 @@
-function count_leading_spaces(str)
+local function getObjKeyNames(tbl)
+    local binds = {}
+    for key, _ in pairs(tbl) do
+        table.insert(binds, key)
+    end
+    return binds
+end
+
+local function unsetBinds(binds, wk)
+    for i = 1, #binds do
+        vim.notify(" " .. binds[i], vim.log.levels.INFO)
+        pcall(vim.keymap.del, "n", "<leader>h" .. binds[i])
+    end
+end
+
+local function count_leading_spaces(str)
     local _, count = string.find(str, "^( *)")
     return count or 0
 end
@@ -8,7 +23,6 @@ local function GetContentUnderCursor()
     local line_content = vim.api.nvim_buf_get_lines(0, line_num - 1, line_num, false)[1]
     local indent = count_leading_spaces(line_content)
     vim.fn.setreg("+", line_content)
-    vim.notify("indent:" .. indent, vim.log.levels.INFO)
     return indent
 end
 
@@ -42,8 +56,10 @@ local function remove_special_chars(str)
 end
 
 return {
+    getObjKeyNames = getObjKeyNames,
     SeperateWords = SeperateWords,
     remove_special_chars = remove_special_chars,
     GetContentUnderCursor = GetContentUnderCursor,
     PrintToBuffer = PrintToBuffer,
+    unsetBinds = unsetBinds,
 }
