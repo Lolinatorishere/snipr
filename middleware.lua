@@ -8,7 +8,6 @@ end
 
 local function unsetBinds(binds, wk)
     for i = 1, #binds do
-        vim.notify(" " .. binds[i], vim.log.levels.INFO)
         pcall(vim.keymap.del, "n", "<leader>h" .. binds[i])
     end
 end
