@@ -1,5 +1,6 @@
 local JsSnips = require("custom.snipr.snips.javascript")
 local HtmlSnips = require("custom.snipr.snips.html")
+local CcppSnips = require("custom.snipr.snips.ccpp")
 local Middleware = require("custom.snipr.middleware")
 local wk = require("which-key")
 local binds = { ft = "", binds = {} }
@@ -36,6 +37,11 @@ function Snippers(ft)
         if ft == "html" then
             Middleware.unsetBinds(binds)
             binds = HtmlSnips(Middleware, wk)
+            return
+        end
+        if ft == "c" or ft == "cpp" then
+            Middleware.unsetBinds(binds)
+            binds = CcppSnips(Middleware, wk)
             return
         end
         vim.notify("no snips for filetype: " .. ft, vim.log.levels.INFO)

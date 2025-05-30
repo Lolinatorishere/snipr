@@ -15,9 +15,13 @@ local keys = {
             end
             lines = 3
             empty = 2
+            mode = "n"
+            endofline = true
         else
             lines = 1
             empty = 1
+            mode = "n"
+            endofline = true
         end
         reg = reg .. "</" .. words[1] .. ">"
     end,
@@ -30,9 +34,13 @@ local keys = {
             end
             lines = 3
             empty = 2
+            mode = "n"
+            endofline = true
         else
             lines = 1
             empty = 1
+            mode = "n"
+            endofline = true
         end
         reg = reg .. "</" .. words[1] .. ">"
     end,
@@ -45,9 +53,13 @@ local keys = {
             end
             lines = 3
             empty = 2
+            mode = "n"
+            endofline = true
         else
             lines = 1
             empty = 1
+            mode = "n"
+            endofline = true
         end
         reg = reg .. "</" .. words[1] .. ">"
     end,
@@ -60,23 +72,33 @@ local keys = {
             end
             lines = 3
             empty = 2
+            mode = "n"
+            endofline = true
         else
             lines = 1
             empty = 1
+            mode = "n"
+            endofline = true
         end
         reg = reg .. "</" .. words[1] .. ">"
     end,
     c = function(words, _)
         lines = 1
         empty = 1
+        mode = "n"
+        endofline = true
     end,
     i = function(words, _)
         lines = 1
         empty = 1
+        mode = "n"
+        endofline = true
     end,
     s = function(words, _)
         lines = 1
         empty = 1
+        mode = "n"
+        endofline = true
     end,
 }
 
@@ -94,6 +116,7 @@ local function SetFuncs(key, middleware)
     if #words == 0 then
         return
     end
+    keys[key](words, middleware)
     local print = vim.split(reg, "\n")
     local row = vim.api.nvim_win_get_cursor(0)[1] - 1
     local col = vim.api.nvim_win_get_cursor(0)[2]
