@@ -120,11 +120,11 @@ local keys = {
     end,
 
     i = function(words, _)
-        reg = "if( "
+        reg = "if("
         if #words > 1 then
             reg = reg .. words[1]
             for i = 2, #words do
-                reg = reg .. words[i]
+                reg = reg .. " " .. words[i]
             end
         elseif #words == 1 then
             reg = reg .. words[1]
@@ -167,14 +167,53 @@ local keys = {
         reg = reg .. "){\n\n}"
         lines = 3
         empty = 2
-        lines = 3
-        empty = 2
         mode = "i"
         endofline = true
+    end,
+
+    sh = function(words, _)
+        if #words == 0 then
+            reg = "switch(){\n\ndefault:\nbreak;\n}\n"
+            lines = 5
+            empty = 2
+            mode = "i"
+            endofline = true
+        else
+            reg = "switch(" .. words[1] .. "){\n\ndefault:\nbreak;\n}\n"
+            lines = 5
+            empty = 2
+            mode = "i"
+            endofline = true
+        end
+    end,
+
+    sc = function(words, _)
+        if #words == 0 then
+            reg = ""
+            empty = 1
+            lines = 1
+            mode = "n"
+            endofline = false
+            return
+        else
+            for i = 1, #words do
+                reg = reg .. "case " .. words[i] .. ":\n\nbreak;\n"
+                lines = 2 * i
+            end
+            empty = 1
+            mode = "i"
+            endofline = true
+        end
     end,
 }
 
 local function SetFuncs(key, middleware)
+    lines = 0
+    empty = 0
+    mode = "n"
+    endofline = false
+    reg = ""
+    colpos = 0
     local indent = middleware.GetContentUnderCursor()
     local SeperateWords = middleware.SeperateWords
     --    vim.notify(key, vim.log.levels.INFO)
@@ -203,6 +242,7 @@ local function CcppUpdateBuffers(middleware, wk)
     wk.add({
         { "<leader>h", group = "c/cpp snips" },
         { "<leader>he", group = "elses" },
+        { "<leader>hs", group = "switch" },
     })
     vim.keymap.set("n", "<leader>hf", function()
         SetFuncs("f", middleware)
@@ -219,9 +259,12 @@ local function CcppUpdateBuffers(middleware, wk)
     vim.keymap.set("n", "<leader>hei", function()
         SetFuncs("ei", middleware)
     end, { desc = "else if(words1){}" })
-    vim.keymap.set("n", "<leader>hei", function()
-        SetFuncs("ei", middleware)
-    end, { desc = "switch(words1){case words2: break... default: return 0;}" })
+    vim.keymap.set("n", "<leader>hsh", function()
+        SetFuncs("sh", middleware)
+    end, { desc = "switch(words1){ default: break;}" })
+    vim.keymap.set("n", "<leader>hsc", function()
+        SetFuncs("sc", middleware)
+    end, { desc = "case words1: break;" })
     ibinds = middleware.getObjKeyNames(keys)
     return { ft = "html", binds = ibinds }
 end
