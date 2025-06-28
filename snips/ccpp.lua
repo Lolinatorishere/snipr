@@ -79,31 +79,47 @@ local keys = {
 
     f = function(words, _)
         local start = 0
+        local i = 0
         if #words > 1 then
             local dtype = false
+            reg = "int " .. words[1] .. "("
+            start = 2
             if CDataTypes[words[1]] ~= nil then
                 reg = CDataTypes[words[1]] .. " "
                 reg = reg .. words[2] .. "("
                 start = 3
-            else
-                reg = "int " .. words[1] .. "("
-                start = 2
             end
-            for i = start, #words do
-                if CDataTypes[words[i]] ~= nil and dtype == false then
-                    reg = reg .. CDataTypes[words[i]] .. " "
-                    dtype = true
-                else
-                    if dtype == true then
-                        reg = reg .. words[i]
-                    else
+            if words[1]:sub(1, 1) == "%" then
+                words[1] = words[1]:sub(2)
+                reg = words[1] .. " " .. words[2] .. "("
+                start = 3
+            end
+            i = start
+            while i <= #words do
+                local function work()
+                    if dtype == false then
+                        if CDataTypes[words[i]] ~= nil then
+                            reg = reg .. CDataTypes[words[i]] .. " "
+                            dtype = true
+                            return
+                        end
+                        if words[i]:sub(1, 1) == "%" then
+                            words[i] = words[i]:sub(2)
+                            reg = reg .. words[i] .. " "
+                            dtype = true
+                            return
+                        end
                         reg = reg .. "int " .. words[i]
+                        return
                     end
+                    reg = reg .. words[i]
                     dtype = false
                 end
+                work()
                 if i ~= #words and dtype == false then
-                    reg = reg .. ","
+                    reg = reg .. ", "
                 end
+                i = i + 1
             end
             reg = reg .. "){\n\n}"
             lines = 3
