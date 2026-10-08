@@ -63,7 +63,9 @@ function M.expand(snippet)
     M.apply(result, row, base_indent)
 end
 
-function M.attach(buf, module)
+-- keys: { [snippet.key] = key to bind } (see keys.lua); defaults to snippet.key
+function M.attach(buf, module, keys)
+    keys = keys or {}
     local has_wk, wk = pcall(require, "which-key")
     if has_wk then
         local spec = { { "<leader>h", group = module.group, buffer = buf } }
@@ -72,17 +74,22 @@ function M.attach(buf, module)
         end
         wk.add(spec)
     end
+    local bound = {}
     for _, snippet in ipairs(module.snippets) do
-        vim.keymap.set("n", "<leader>h" .. snippet.key, function()
+        local lhs = "<leader>h" .. (keys[snippet.key] or snippet.key)
+        vim.keymap.set("n", lhs, function()
             M.expand(snippet)
         end, { buffer = buf, desc = snippet.desc })
+        table.insert(bound, lhs)
     end
+    vim.b[buf].snipr_lhs = bound
 end
 
-function M.detach(buf, module)
-    for _, snippet in ipairs(module.snippets) do
-        pcall(vim.keymap.del, "n", "<leader>h" .. snippet.key, { buffer = buf })
+function M.detach(buf)
+    for _, lhs in ipairs(vim.b[buf].snipr_lhs or {}) do
+        pcall(vim.keymap.del, "n", lhs, { buffer = buf })
     end
+    vim.b[buf].snipr_lhs = nil
 end
 
 return M

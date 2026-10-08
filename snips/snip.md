@@ -26,6 +26,33 @@ return {
 }
 ```
 
+## Custom keys
+
+Every snippet uses its default `key` unless you override it in `init.lua`:
+
+```lua
+require("custom.snipr.snippers").setup({
+    keys = {
+        ccpp = { lf = "L", r = "R" },   -- module name -> { default key = custom key }
+        javascript = { l = "c" },
+    },
+})
+```
+
+Keys are relative to `<leader>h`. An override falls back to the snippet's
+default key, and a warning is shown through lazy.nvim's notify, when:
+
+- it names a snippet or module that doesn't exist, or the key isn't a non-empty string;
+- it clashes with another snippet's key in the same module. Keys clash when
+  they are equal, or when one is a prefix of the other (`e` vs `ee`), since
+  vim would otherwise wait on the shorter key.
+
+A custom key can take a default key that another override frees up
+(`{ i = "Q", lf = "i" }`). Reverting one override can make another one clash;
+that one reverts too.
+
+## Snippet behaviour
+
 - The current line's indentation is applied to every output line.
 - Each leading `\t` in an output line is one extra indent level (respects `expandtab`/`shiftwidth`).
 - `util` (see `util.lua`): `words`, `join(words, sep, from, to)`, `starts_with`, `ends_with`,
