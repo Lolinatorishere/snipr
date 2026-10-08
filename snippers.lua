@@ -1,60 +1,41 @@
-local JsSnips = require("custom.snipr.snips.javascript")
-local HtmlSnips = require("custom.snipr.snips.html")
-local CcppSnips = require("custom.snipr.snips.ccpp")
-local Middleware = require("custom.snipr.middleware")
-local wk = require("which-key")
-local binds = { ft = "", binds = {} }
+local engine = require("custom.snipr.engine")
 
-local Allowed_ft = {
-    javascript = true,
-    javascriptreact = true,
-    typescript = true,
-    typescriptreact = true,
-    html = true,
-    css = true,
-    scss = true,
-    less = true,
-    vue = true,
-    c = true,
-    cpp = true,
-    cs = true,
-    lua = true,
+-- filetype -> module under custom.snipr.snips
+local registry = {
+    javascript = "javascript",
+    javascriptreact = "javascript",
+    typescript = "javascript",
+    typescriptreact = "javascript",
+    html = "html",
+    c = "ccpp",
+    cpp = "ccpp",
 }
 
-function Snippers(ft)
-    if ft == nil then
-        pcall(vim.keymap.del, "n", "<leader>h")
+local function attach(buf)
+    local name = registry[vim.bo[buf].filetype]
+    local current = vim.b[buf].snipr_module
+    if name == current then
         return
     end
-    if Allowed_ft[ft] then
-        if #binds.binds > 0 and ft ~= binds.ft then
-            Middleware.unsetBinds(binds.binds, wk)
-        end
-        if ft == "javascript" then
-            binds = JsSnips(Middleware, wk)
-            return
-        end
-        if ft == "html" then
-            Middleware.unsetBinds(binds)
-            binds = HtmlSnips(Middleware, wk)
-            return
-        end
-        if ft == "c" or ft == "cpp" then
-            Middleware.unsetBinds(binds)
-            binds = CcppSnips(Middleware, wk)
-            return
-        end
-        vim.notify("no snips for filetype: " .. ft, vim.log.levels.INFO)
-        return
+    if current ~= nil then
+        engine.detach(buf, require("custom.snipr.snips." .. current))
     end
-    wk.add({
-        { "<leader>h", group = "snips", desc = "unsuported" },
-    })
-    pcall(vim.keymap.del, "n", "<leader>h")
+    if name ~= nil then
+        engine.attach(buf, require("custom.snipr.snips." .. name))
+    end
+    vim.b[buf].snipr_module = name
 end
 
-vim.api.nvim_create_autocmd({ "BufEnter" }, {
-    callback = function()
-        Snippers(vim.bo.filetype)
+vim.api.nvim_create_autocmd("FileType", {
+    group = vim.api.nvim_create_augroup("snipr", { clear = true }),
+    callback = function(args)
+        attach(args.buf)
     end,
 })
+
+-- buffers that were already open before this file was loaded
+for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(buf) then
+        attach(buf)
+    end
+end

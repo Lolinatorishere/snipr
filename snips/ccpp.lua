@@ -1,288 +1,123 @@
-local lines = 0
-local empty = 0
-local mode = "n"
-local endofline = false
-local reg = ""
-local colpos = 0
+-- Type tokens: $i -> int, $v -> void, %anything -> anything (see util.CDataTypes)
 
---local elif = {
---    ["$e"] = { "else(", true },
---    ["$ei"] = { "else if(", true },
---    ["$r"] = { "return ", true },
---}
---
---local switch = {
---    ["$c"] = { "case ", true },
---    ["$b"] = { "break;", true },
---    ["$r"] = { "return ", true },
---}
+local function block(head, tail)
+    return { lines = { head .. "{", "\t", tail or "}" }, cursor = { 2, "eol" }, mode = "i" }
+end
 
-local CDataTypes = {
-    ["$v"] = "void",
-    ["$c"] = "char",
-    ["$s"] = "short",
-    ["$i"] = "int",
-    ["$l"] = "long",
-    ["$f"] = "float",
-    ["$d"] = "double",
-    ["$ll"] = "long long",
-    ["$ld"] = "long double",
-    ["$uc"] = "unsigned char",
-    ["$us"] = "unsigned short",
-    ["$ui"] = "unsigned int",
-    ["$ul"] = "unsigned long",
-    ["$uf"] = "unsinged float",
-    ["$ud"] = "unsinged double",
-    ["$ull"] = "unsigned long long",
-    ["$uld"] = "unsigned long double",
-    ["$u8"] = "uint8_t",
-    ["$8"] = "int8_t",
-    ["$u16"] = "uint16_t",
-    ["$16"] = "int16_t",
-    ["$u32"] = "uint32_t",
-    ["$32"] = "int32_t",
-    ["$u64"] = "uint64_t",
-    ["$64"] = "int64_t",
-    ["$%hd"] = "short",
-    ["$%hu"] = "unsigned short",
-    ["$%u"] = "unsigned int",
-    ["$%d"] = "int",
-    ["$%ld"] = "long",
-    ["$%lu"] = "unsigned long",
-    ["$%lld"] = "long long",
-    ["$%llu"] = "unsigned long long",
-    ["$%c"] = "char",
-    ["$%f"] = "float",
-    ["$%lf"] = "double",
-    ["$%Lf"] = "long double",
+-- "}else" style chaining: a leading "}" on the line is kept in front
+local function take_brace(w)
+    if w[1] ~= nil and w[1]:sub(1, 1) == "}" then
+        w[1] = w[1]:sub(2)
+        if w[1] == "" then
+            table.remove(w, 1)
+        end
+        return "}"
+    end
+    return ""
+end
+
+return {
+    group = "c/cpp snips",
+    subgroups = { e = "elses", s = "switch", l = "loops" },
+    snippets = {
+        {
+            key = "c",
+            desc = "$dtype n words n...",
+            min_words = 1,
+            expand = function(w, u)
+                local out = {}
+                for i, word in ipairs(w) do
+                    out[i] = u.ctype(word) or word
+                end
+                return { lines = { u.join(out) }, cursor = { 1, "eol" }, mode = "i" }
+            end,
+        },
+        {
+            key = "f",
+            desc = "$dtype1 words2({$dtype words}..){}",
+            expand = function(w, u)
+                if #w == 0 then
+                    return block("int function()")
+                end
+                local ret, name, start = "int", w[1], 2
+                if u.ctype(w[1]) ~= nil then
+                    ret, name, start = u.ctype(w[1]), w[2] or "function", 3
+                end
+                return block(ret .. " " .. name .. "(" .. u.typed_list(w, start, ", ", "int") .. ")")
+            end,
+        },
+        {
+            key = "i",
+            desc = "if({words1 $comp words2} $||$&& ...){}",
+            expand = function(w, u)
+                return block("if(" .. u.join(w) .. ")")
+            end,
+        },
+        {
+            key = "ee",
+            desc = "else{}",
+            expand = function(w, _)
+                return block(take_brace(w) .. "else")
+            end,
+        },
+        {
+            key = "ei",
+            desc = "else if(words1){}",
+            expand = function(w, u)
+                local brace = take_brace(w)
+                return block(brace .. "else if(" .. u.join(w) .. ")")
+            end,
+        },
+        {
+            key = "sh",
+            desc = "switch(words1){ default: break;}",
+            expand = function(w, _)
+                return {
+                    lines = { "switch(" .. (w[1] or "") .. "){", "\t", "default:", "\tbreak;", "}" },
+                    cursor = { 2, "eol" },
+                    mode = "i",
+                }
+            end,
+        },
+        {
+            key = "sc",
+            desc = "case words1: break;",
+            min_words = 1,
+            expand = function(w, _)
+                local lines = {}
+                for _, word in ipairs(w) do
+                    vim.list_extend(lines, { "case " .. word .. ":", "\t", "\tbreak;" })
+                end
+                return { lines = lines, cursor = { 2, "eol" }, mode = "i" }
+            end,
+        },
+        {
+            key = "lf",
+            desc = "for($dtype words1 ; $opperand words2 ; words1 $opperand){}",
+            min_words = 3,
+            expand = function(w, u)
+                local t = u.CDataTypes[w[1]]
+                if t == nil then
+                    return nil
+                end
+                local var = u.strip_after(w[2], "=")
+                local step = u.COperands[w[4]] or "++"
+                return block("for (" .. t .. " " .. w[2] .. " ; " .. var .. w[3] .. " ; " .. var .. step .. " ) ")
+            end,
+        },
+        {
+            key = "r",
+            desc = "return words n ... ;",
+            expand = function(w, u)
+                if w[1] == "return" then
+                    table.remove(w, 1)
+                end
+                local line = #w > 0 and ("return " .. u.join(w)) or "return"
+                if not u.ends_with(line, ";") then
+                    line = line .. ";"
+                end
+                return { lines = { line }, cursor = { 1, "eol" }, mode = "i" }
+            end,
+        },
+    },
 }
-
---xshort int %hd
---xunsigned short int %hu
---xunsigned int %u
---xint %d
---xlong int %ld
---xunsigned long int %lu
---xlong long int %lld
---xunsigned long long int %llu
---xsigned char %c
---xunsigned char %c
---float %f
---double %lf
---long double %Lf
-
-local function StartsWithBrace(input)
-    return input:sub(1, 1) == "}"
-end
-
-local keys = {
-
-    f = function(words, _)
-        local start = 0
-        local i = 0
-        if #words > 1 then
-            local dtype = false
-            reg = "int " .. words[1] .. "("
-            start = 2
-            if CDataTypes[words[1]] ~= nil then
-                reg = CDataTypes[words[1]] .. " "
-                reg = reg .. words[2] .. "("
-                start = 3
-            end
-            if words[1]:sub(1, 1) == "%" then
-                words[1] = words[1]:sub(2)
-                reg = words[1] .. " " .. words[2] .. "("
-                start = 3
-            end
-            i = start
-            while i <= #words do
-                local function work()
-                    if dtype == false then
-                        if CDataTypes[words[i]] ~= nil then
-                            reg = reg .. CDataTypes[words[i]] .. " "
-                            dtype = true
-                            return
-                        end
-                        if words[i]:sub(1, 1) == "%" then
-                            words[i] = words[i]:sub(2)
-                            reg = reg .. words[i] .. " "
-                            dtype = true
-                            return
-                        end
-                        reg = reg .. "int " .. words[i]
-                        return
-                    end
-                    reg = reg .. words[i]
-                    dtype = false
-                end
-                work()
-                if i ~= #words and dtype == false then
-                    reg = reg .. ", "
-                end
-                i = i + 1
-            end
-            reg = reg .. "){\n\n}"
-            lines = 3
-            empty = 3
-            mode = "i"
-            endofline = true
-        else
-            reg = "int function(){\n\n}"
-            lines = 3
-            empty = 2
-            mode = "i"
-            endofline = true
-        end
-    end,
-
-    i = function(words, _)
-        reg = "if("
-        if #words > 1 then
-            reg = reg .. words[1]
-            for i = 2, #words do
-                reg = reg .. " " .. words[i]
-            end
-        elseif #words == 1 then
-            reg = reg .. words[1]
-        end
-        reg = reg .. "){\n\n}"
-        lines = 3
-        empty = 2
-        mode = "i"
-        endofline = true
-    end,
-
-    ee = function(words, _)
-        if words[1] == "}" then
-            reg = "}"
-        end
-        reg = reg .. "else{\n\n}"
-        lines = 3
-        empty = 2
-        mode = "i"
-        endofline = true
-    end,
-
-    ei = function(words, _)
-        if #words ~= 0 then
-            if StartsWithBrace then
-                reg = "}"
-                words[1] = words[1]:sub(2)
-            end
-            reg = reg .. "else if("
-            if #words > 1 then
-                for i = 1, #words do
-                    reg = reg .. words[i]
-                end
-            else
-                reg = reg .. words[1]
-            end
-        else
-            reg = reg .. "else if("
-        end
-        reg = reg .. "){\n\n}"
-        lines = 3
-        empty = 2
-        mode = "i"
-        endofline = true
-    end,
-
-    sh = function(words, _)
-        if #words == 0 then
-            reg = "switch(){\n\ndefault:\nbreak;\n}\n"
-            lines = 5
-            empty = 2
-            mode = "i"
-            endofline = true
-        else
-            reg = "switch(" .. words[1] .. "){\n\ndefault:\nbreak;\n}\n"
-            lines = 5
-            empty = 2
-            mode = "i"
-            endofline = true
-        end
-    end,
-
-    sc = function(words, _)
-        if #words == 0 then
-            reg = ""
-            empty = 1
-            lines = 1
-            mode = "n"
-            endofline = false
-            return
-        else
-            for i = 1, #words do
-                reg = reg .. "case " .. words[i] .. ":\n\nbreak;\n"
-                lines = 2 * i
-            end
-            empty = 1
-            mode = "i"
-            endofline = true
-        end
-    end,
-}
-
-local function SetFuncs(key, middleware)
-    lines = 0
-    empty = 0
-    mode = "n"
-    endofline = false
-    reg = ""
-    colpos = 0
-    local indent = middleware.GetContentUnderCursor()
-    local SeperateWords = middleware.SeperateWords
-    --    vim.notify(key, vim.log.levels.INFO)
-    if key == nil then
-        return
-    end
-    if vim.fn.getreg("+") == nil then
-        return
-    end
-    local words = SeperateWords(vim.fn.getreg("+"))
-    keys[key](words, middleware)
-    local print = vim.split(reg, "\n")
-    local row = vim.api.nvim_win_get_cursor(0)[1] - 1
-    local col = vim.api.nvim_win_get_cursor(0)[2]
-    if endofline == true then
-        col = #vim.api.nvim_get_current_line()
-    else
-        col = colpos
-    end
-    local cursor = { row = row + empty, col = col }
-    middleware.PrintToBuffer(row, col, cursor, print, mode, indent, lines)
-end
-
-local function CcppUpdateBuffers(middleware, wk)
-    local ibinds = {}
-    wk.add({
-        { "<leader>h", group = "c/cpp snips" },
-        { "<leader>he", group = "elses" },
-        { "<leader>hs", group = "switch" },
-    })
-    vim.keymap.set("n", "<leader>hf", function()
-        SetFuncs("f", middleware)
-    end, { desc = "$dtype1 words2({$dtype words}..){}" })
-    vim.keymap.set("n", "<leader>hi", function()
-        SetFuncs("i", middleware)
-    end, { desc = "if({words1 $comp words2} $||$&& ...){}" })
-    vim.keymap.set("n", "<leader>hI", function()
-        SetFuncs("I", middleware)
-    end, { desc = "elseif({words1 $comp words2} $||$&& ...){}" })
-    vim.keymap.set("n", "<leader>hee", function()
-        SetFuncs("ee", middleware)
-    end, { desc = "else{}" })
-    vim.keymap.set("n", "<leader>hei", function()
-        SetFuncs("ei", middleware)
-    end, { desc = "else if(words1){}" })
-    vim.keymap.set("n", "<leader>hsh", function()
-        SetFuncs("sh", middleware)
-    end, { desc = "switch(words1){ default: break;}" })
-    vim.keymap.set("n", "<leader>hsc", function()
-        SetFuncs("sc", middleware)
-    end, { desc = "case words1: break;" })
-    ibinds = middleware.getObjKeyNames(keys)
-    return { ft = "html", binds = ibinds }
-end
-
-return CcppUpdateBuffers

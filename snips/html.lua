@@ -1,163 +1,73 @@
-local lines = 0
-local empty = 0
-local mode = "n"
-local endofline = false
-local reg = ""
-local colpos = 0
+-- <open></close> on one line with the cursor on the closing tag, or a
+-- three-line block when there is inner text.
+local function element(tag, attrs, w, u, from)
+    local open = "<" .. tag .. attrs .. ">"
+    local close = "</" .. tag .. ">"
+    if #w >= from then
+        return { lines = { open, "\t" .. u.join(w, " ", from), close }, cursor = { 2, "eol" }, mode = "n" }
+    end
+    return { lines = { open .. close }, cursor = { 1, #open }, mode = "n" }
+end
 
-local keys = {
-    t = function(words, _)
-        reg = "<" .. words[1] .. ">"
-        if #words > 1 then
-            reg = reg .. "\n"
-            for i = 2, #words do
-                reg = reg .. " " .. words[i]
-            end
-            lines = 3
-            empty = 2
-            mode = "n"
-            endofline = true
-        else
-            lines = 1
-            empty = 1
-            mode = "n"
-            endofline = true
-        end
-        reg = reg .. "</" .. words[1] .. ">"
-    end,
-    Ta = function(words, _)
-        reg = "<" .. words[1] .. ' class="' .. words[2] .. '"' .. 'id="' .. words[3] .. '"' .. ">"
-        if #words > 1 then
-            reg = reg .. "\n"
-            for i = 2, #words do
-                reg = reg .. " " .. words[i]
-            end
-            lines = 3
-            empty = 2
-            mode = "n"
-            endofline = true
-        else
-            lines = 1
-            empty = 1
-            mode = "n"
-            endofline = true
-        end
-        reg = reg .. "</" .. words[1] .. ">"
-    end,
-    Tc = function(words, _)
-        reg = "<" .. words[1] .. ' class="' .. words[2] .. '"' .. ">"
-        if #words > 1 then
-            reg = reg .. "\n"
-            for i = 2, #words do
-                reg = reg .. " " .. words[i]
-            end
-            lines = 3
-            empty = 2
-            mode = "n"
-            endofline = true
-        else
-            lines = 1
-            empty = 1
-            mode = "n"
-            endofline = true
-        end
-        reg = reg .. "</" .. words[1] .. ">"
-    end,
-    Ti = function(words, _)
-        reg = "<" .. words[1] .. ' id="' .. words[2] .. '"' .. ">"
-        if #words > 1 then
-            reg = reg .. "\n"
-            for i = 2, #words do
-                reg = reg .. " " .. words[i]
-            end
-            lines = 3
-            empty = 2
-            mode = "n"
-            endofline = true
-        else
-            lines = 1
-            empty = 1
-            mode = "n"
-            endofline = true
-        end
-        reg = reg .. "</" .. words[1] .. ">"
-    end,
-    c = function(words, _)
-        lines = 1
-        empty = 1
-        mode = "n"
-        endofline = true
-    end,
-    i = function(words, _)
-        lines = 1
-        empty = 1
-        mode = "n"
-        endofline = true
-    end,
-    s = function(words, _)
-        lines = 1
-        empty = 1
-        mode = "n"
-        endofline = true
-    end,
+return {
+    group = "Html snips",
+    subgroups = { T = "tag++" },
+    snippets = {
+        {
+            key = "t",
+            desc = "<word1> words...</word1>",
+            min_words = 1,
+            expand = function(w, u)
+                return element(w[1], "", w, u, 2)
+            end,
+        },
+        {
+            key = "Ta",
+            desc = '<word1 class="word2" id="word3"> words...</word1>',
+            min_words = 3,
+            expand = function(w, u)
+                return element(w[1], ' class="' .. w[2] .. '" id="' .. w[3] .. '"', w, u, 4)
+            end,
+        },
+        {
+            key = "Tc",
+            desc = '<word1 class="word2"> words...</word1>',
+            min_words = 2,
+            expand = function(w, u)
+                return element(w[1], ' class="' .. w[2] .. '"', w, u, 3)
+            end,
+        },
+        {
+            key = "Ti",
+            desc = '<word1 id="word2"> words...</word1>',
+            min_words = 2,
+            expand = function(w, u)
+                return element(w[1], ' id="' .. w[2] .. '"', w, u, 3)
+            end,
+        },
+        {
+            key = "c",
+            desc = '<div class="word1"></div>',
+            min_words = 1,
+            expand = function(w, u)
+                return element("div", ' class="' .. w[1] .. '"', w, u, 2)
+            end,
+        },
+        {
+            key = "i",
+            desc = '<div id="word1"></div>',
+            min_words = 1,
+            expand = function(w, u)
+                return element("div", ' id="' .. w[1] .. '"', w, u, 2)
+            end,
+        },
+        {
+            key = "s",
+            desc = '<div word1="word2"></div>',
+            min_words = 2,
+            expand = function(w, u)
+                return element("div", " " .. w[1] .. '="' .. w[2] .. '"', w, u, 3)
+            end,
+        },
+    },
 }
-
-local function SetFuncs(key, middleware)
-    local indent = middleware.GetContentUnderCursor()
-    local SeperateWords = middleware.SeperateWords
-    --    vim.notify(key, vim.log.levels.INFO)
-    if key == nil then
-        return
-    end
-    if vim.fn.getreg("+") == nil then
-        return
-    end
-    local words = SeperateWords(vim.fn.getreg("+"))
-    if #words == 0 then
-        return
-    end
-    keys[key](words, middleware)
-    local print = vim.split(reg, "\n")
-    local row = vim.api.nvim_win_get_cursor(0)[1] - 1
-    local col = vim.api.nvim_win_get_cursor(0)[2]
-    if endofline == true then
-        col = #vim.api.nvim_get_current_line()
-    else
-        col = colpos
-    end
-    local cursor = { row = row + empty, col = col }
-    middleware.PrintToBuffer(row, col, cursor, print, mode, indent, lines)
-end
-
-local function HtmlUpdateBuffers(middleware, wk)
-    local ibinds = {}
-    wk.add({
-        { "<leader>h", group = "Html snips" },
-        { "<leader>hT", group = "tag++" },
-    })
-    vim.keymap.set("n", "<leader>ht", function()
-        SetFuncs("t", middleware)
-    end, { desc = "<word1></word1>" })
-    vim.keymap.set("n", "<leader>hTa", function()
-        SetFuncs("Ta", middleware)
-    end, { desc = '<word1 class="word2" id="word3"> words...</word1>' })
-    vim.keymap.set("n", "<leader>hTc", function()
-        SetFuncs("Tc", middleware)
-    end, { desc = '<word1 class="word2"> words...</word1>' })
-    vim.keymap.set("n", "<leader>hTi", function()
-        SetFuncs("Ti", middleware)
-    end, { desc = '<word1 id="word2"> words...</word1>' })
-    vim.keymap.set("n", "<leader>hc", function()
-        SetFuncs("c", middleware)
-    end, { desc = '<tag class="word1"></tag>' })
-    vim.keymap.set("n", "<leader>hi", function()
-        SetFuncs("i", middleware)
-    end, { desc = '<tag id="word1"></tag>' })
-    vim.keymap.set("n", "<leader>hs", function()
-        SetFuncs("s", middleware)
-    end, { desc = '<tag word1="word2"></tag>' })
-    ibinds = middleware.getObjKeyNames(keys)
-    return { ft = "html", binds = ibinds }
-end
-
-return HtmlUpdateBuffers
