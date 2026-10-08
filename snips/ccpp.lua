@@ -93,16 +93,26 @@ return {
         },
         {
             key = "lf",
-            desc = "for($dtype words1 ; $opperand words2 ; words1 $opperand){}",
-            min_words = 3,
+            -- $i a lt 100 pp   -> for(int a; a <= 100; a++){}
+            -- $i a lt 100 pe 2 -> for(int a; a <= 100; a += 2){}
+            -- the var may carry an initialiser (a=0); the step defaults to ++,
+            -- and pe/me (+=/-=) take the word after them (default 1)
+            desc = "$dtype word1 $opperand word2 [$opperand [word3]] -> for(dtype word1; word1 op word2; word1 op [word3]){}",
+            min_words = 4,
             expand = function(w, u)
-                local t = u.CDataTypes[w[1]]
-                if t == nil then
+                local t = u.ctype(w[1])
+                local cmp = u.COperands[w[3]]
+                if t == nil or cmp == nil then
                     return nil
                 end
                 local var = u.strip_after(w[2], "=")
-                local step = u.COperands[w[4]] or "++"
-                return block("for (" .. t .. " " .. w[2] .. " ; " .. var .. w[3] .. " ; " .. var .. step .. " ) ")
+                local step = w[5] and (u.COperands[w[5]] or w[5]) or "++"
+                if u.CAssignOperands[step] then
+                    step = " " .. step .. " " .. (w[6] or "1")
+                end
+                return block(
+                    "for(" .. t .. " " .. w[2] .. "; " .. var .. " " .. cmp .. " " .. w[4] .. "; " .. var .. step .. ")"
+                )
             end,
         },
         {

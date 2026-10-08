@@ -85,6 +85,8 @@ M.COperands = {
     ["||"] = "||",
     ["++"] = "++",
     ["--"] = "--",
+    ["+="] = "+=",
+    ["-="] = "-=",
     ["eq"] = "==",
     ["ne"] = "!=",
     ["gt"] = ">=",
@@ -95,6 +97,14 @@ M.COperands = {
     ["or"] = "||",
     ["pp"] = "++",
     ["mm"] = "--",
+    ["pe"] = "+=",
+    ["me"] = "-=",
+}
+
+-- operators that take a value after them: i += 2
+M.CAssignOperands = {
+    ["+="] = true,
+    ["-="] = true,
 }
 
 -- Resolve a type token: "$i" -> "int", "%size_t" -> "size_t", anything else -> nil
